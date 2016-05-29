@@ -41,42 +41,22 @@
  *
  */
 
+#ifndef __NATTY_CLIENT_DEVICE__
+#define __NATTY_CLIENT_DEVICE__
 
 
-
-
-#ifndef __NATTY_ABSTRACT_CLASS_H__
-#define __NATTY_ABSTRACT_CLASS_H__
-
-#include "kal_public_api.h"
-#include "OslMemory_Int.h"
-
-#if 1
-typedef long long U64;
-typedef unsigned int U32;
-typedef unsigned short U16;
-typedef unsigned char U8;
-#endif
-
-typedef long long C_DEVID;
-
-
-typedef int (*HANDLE_CLIENTID)(void* client, C_DEVID id);
-typedef int (*HANDLE_NOTIFY)(C_DEVID from, C_DEVID to);
-typedef void (*HANDLE_TIMER)(void);
-
-
-typedef struct {
-	size_t size;
-	void* (*ctor)(void *_self);
-	void* (*dtor)(void *_self);
-} AbstractClass;
-
-
-void *New(const void *_class);
-void Delete(void *_class);
+typedef struct _FRIENDSINFO {
+	//C_DEVID devid;
+	U8 sockfd;
+	U32 addr;
+	U16 port;
+	U8 isP2P;
+	U8 counter;
+} FriendsInfo;
 
 
 #endif
+
+
 
 

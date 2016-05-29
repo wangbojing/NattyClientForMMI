@@ -43,40 +43,58 @@
 
 
 
+#ifndef __NATTY_NETWORK_H__
+#define __NATTY_NETWORK_H__
+
+#include "soc_api.h"
+
+#include "NattyAbstractClass.h"
 
 
-#ifndef __NATTY_ABSTRACT_CLASS_H__
-#define __NATTY_ABSTRACT_CLASS_H__
+#define CACHE_BUFFER_SIZE	1048
 
-#include "kal_public_api.h"
-#include "OslMemory_Int.h"
+#define HEARTBEAT_TIMEOUT		25
+#define P2P_HEARTBEAT_TIMEOUT	60
+#define P2P_HEARTBEAT_TIMEOUT_COUNTR	5
 
-#if 1
-typedef long long U64;
-typedef unsigned int U32;
-typedef unsigned short U16;
-typedef unsigned char U8;
+#define RESEND_TIMEOUT			200*1000
+
+typedef struct _NETWORK {
+	const void *_;
+	U8	sockfd;
+	sockaddr_struct addr;
+	int length;	
+	HANDLE_TIMER onAck;
+	U32 ackNum;
+	U8 buffer[CACHE_BUFFER_SIZE];
+#if 1 //For mmi
+	U32 accountId;
 #endif
-
-typedef long long C_DEVID;
-
-
-typedef int (*HANDLE_CLIENTID)(void* client, C_DEVID id);
-typedef int (*HANDLE_NOTIFY)(C_DEVID from, C_DEVID to);
-typedef void (*HANDLE_TIMER)(void);
+	//void *timer;
+} Network;
 
 
-typedef struct {
+typedef struct _NETWORKOPERA {
 	size_t size;
 	void* (*ctor)(void *_self);
 	void* (*dtor)(void *_self);
-} AbstractClass;
+	int (*send)(void *_self, sockaddr_struct *to, U8 *buf, int len);
+	int (*recv)(void *_self, U8 *buf, int len, sockaddr_struct *from);
+	int (*resend)(void *_self);
+} NetworkOpera;
 
 
-void *New(const void *_class);
-void Delete(void *_class);
+void *ntyNetworkInstance(void);
+int ntySendFrame(void *self, sockaddr_struct *to, U8 *buf, int len);
+int ntyRecvFrame(void *self, U8 *buf, int len, sockaddr_struct *from);
+void ntySetAddr(sockaddr_struct *addr, U32 addrNum, U16 port);
+
+
+
 
 
 #endif
+
+
 
 
