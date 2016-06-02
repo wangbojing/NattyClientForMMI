@@ -707,10 +707,11 @@ SRC_LIST += plutommi\yxapp\yxappmain.c \
 
 ifdef USE_NATTY_PROTOCOL
 ifeq ($(strip $(USE_NATTY_PROTOCOL)),TRUE)
-SRC_LIST += plutommi\yxapp\Natty\NattyNetwork.c
-SRC_LIST += plutommi\yxapp\Natty\NattyClientDev.c
 SRC_LIST += plutommi\yxapp\Natty\NattyAbstractClass.c
 SRC_LIST += plutommi\yxapp\Natty\NattyRBTree.c
+SRC_LIST += plutommi\yxapp\Natty\NattyNetwork.c
+SRC_LIST += plutommi\yxapp\Natty\NattyTimer.c
+SRC_LIST += plutommi\yxapp\Natty\NattyClientDev.c
 endif
 endif
 

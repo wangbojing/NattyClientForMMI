@@ -50,8 +50,9 @@
 
 #include "kal_public_api.h"
 #include "OslMemory_Int.h"
-
-#if 1
+#include "MMIDataType.h"
+//#include "mmidatatype.h"
+#if 0
 typedef long long U64;
 typedef unsigned int U32;
 typedef unsigned short U16;
@@ -64,7 +65,7 @@ typedef long long C_DEVID;
 typedef int (*HANDLE_CLIENTID)(void* client, C_DEVID id);
 typedef int (*HANDLE_NOTIFY)(C_DEVID from, C_DEVID to);
 typedef void (*HANDLE_TIMER)(void);
-
+typedef PsIntFuncPtr HANDLE_RECV;
 
 typedef struct {
 	size_t size;

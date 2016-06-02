@@ -57,7 +57,6 @@
 #define P2P_HEARTBEAT_TIMEOUT	60
 #define P2P_HEARTBEAT_TIMEOUT_COUNTR	5
 
-#define RESEND_TIMEOUT			200*1000
 
 typedef struct _NETWORK {
 	const void *_;
@@ -65,6 +64,7 @@ typedef struct _NETWORK {
 	sockaddr_struct addr;
 	int length;	
 	HANDLE_TIMER onAck;
+	HANDLE_RECV onRecv;
 	U32 ackNum;
 	U8 buffer[CACHE_BUFFER_SIZE];
 #if 1 //For mmi
@@ -81,16 +81,20 @@ typedef struct _NETWORKOPERA {
 	int (*send)(void *_self, sockaddr_struct *to, U8 *buf, int len);
 	int (*recv)(void *_self, U8 *buf, int len, sockaddr_struct *from);
 	int (*resend)(void *_self);
+	int (*connect)(void *_self);
 } NetworkOpera;
+
+
+
 
 
 void *ntyNetworkInstance(void);
 int ntySendFrame(void *self, sockaddr_struct *to, U8 *buf, int len);
 int ntyRecvFrame(void *self, U8 *buf, int len, sockaddr_struct *from);
+int ntyConnect(void *self);
 void ntySetAddr(sockaddr_struct *addr, U32 addrNum, U16 port);
-
-
-
+void ntySetRecvProc(void *self, HANDLE_RECV func);
+U8 ntyGetSocket(void *self);
 
 
 #endif

@@ -43,42 +43,56 @@
 
 
 
+#ifndef __NATTY_TIMER_H__
+#define __NATTY_TIMER_H__
 
-
-#include <string.h>
-#include <stdio.h>
-
+//#include <pthread.h>
 #include "NattyAbstractClass.h"
 
-void *New(const void *_class) {
-	const AbstractClass *class = _class;
-#ifdef __PLATFORM_LINUX_
-	void *p = calloc(class->size);
+#include "TimerEvents.h"
+
+//typedef void (*HANDLE_TIMER)(int sig);
+
+typedef struct _NetworkTimer {
+	const void *_;
+	int sigNum;
+	U32 timerProcess;
+	HANDLE_TIMER timerFunc;
+#if 0
+	pthread_mutex_t timer_mutex;
+	pthread_cond_t timer_cond;
 #else
-	void *p = OslMalloc(class->size);
+	kal_mutexid networkMutex;
 #endif
-	memset(p, 0, class->size);
-	
-	//assert(p);
-	*(const AbstractClass**)p = class;
-	
-	if (class->ctor) {
-		p = class->ctor(p);
-	}
-	return p;
-}
+} NetworkTimer;
+
+typedef struct _TIMEROPERA {
+	size_t size;
+	void* (*ctor)(void *_self, va_list *params);
+	void* (*dtor)(void *_self);
+	int (*start)(void *_self, HANDLE_TIMER fun);
+	int (*stop)(void *_self);
+} TimerOpera;
 
 
-void Delete(void *_class) {
-	const AbstractClass **class = _class;
+#define TIMER_TICK		200
+#define MS(x)		(x*1000)
 
-	if (_class && (*class) && (*class)->dtor) {
-		_class = (*class)->dtor(_class);
-	}
-#ifdef __PLATFORM_LINUX_
-	free(class->size);
-#else
-	OslMfree(_class);
-#endif	
-}
+#define RESEND_TIMEOUT			200
+
+
+void *ntyNetworkTimerInstance(void);
+int ntyStartTimer(void *self,  HANDLE_TIMER func);
+int ntyStopTimer(void *self);
+
+
+
+#endif
+
+
+
+
+
+
+
 

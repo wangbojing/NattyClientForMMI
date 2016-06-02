@@ -14,6 +14,10 @@
 #endif
 #include "YxBasicApp.h"
 
+#ifdef __USE_NATTY_PROTOCOL__
+#include "Natty/NattyClientDev.h"
+#endif
+
 /////////////////////////////////////////////////////////Global var/////////////////////////////////////////////////////////////
 
 static U16  yxAppNeedRunFlag = 0;
@@ -200,6 +204,10 @@ void YxAppIdleRunFunctions(void)
 		setParam->onlyTest++;
 		YxAppSaveSystemSettings();
 	}
+#endif
+
+#ifdef __USE_NATTY_PROTOCOL__
+	ntyClientDevInit();
 #endif
 	yxAppParam.idleRun = 1;
 }

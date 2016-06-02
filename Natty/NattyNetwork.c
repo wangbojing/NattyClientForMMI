@@ -49,8 +49,10 @@
 
 #include "NattyProtocol.h"
 #include "NattyNetwork.h"
+#include "NattyTimer.h"
 
-static U8 addrArray[4] = {112,93,116,188};
+static U8 addrArray[4] = {112,93,116,188}; //no store in block
+static U32 addrNum = 0xBC745D70; //{112,93,116,188};
 static U16 addrPort = 8888;
 sockaddr_struct serveraddr;
 
@@ -99,10 +101,15 @@ U32 ntyGenCrcValue(U8 *buf, int length) {
 
 
 void ntySetAddr(sockaddr_struct *addr, U32 addrNum, U16 port) {
+	#if 0
 	addr->addr[0] = *(U8*)(&addrNum);
-	addr->addr[1] = *((U8*)(&addrNum)+1);
-	addr->addr[2] = *((U8*)(&addrNum)+2);
-	addr->addr[3] = *((U8*)(&addrNum)+3);
+	addr->addr[1] = *(((U8*)(&addrNum))+1);
+	addr->addr[2] = *(((U8*)(&addrNum))+2);
+	addr->addr[3] = *(((U8*)(&addrNum))+3);
+	#else
+	kal_prompt_trace(MOD_YXAPP, " addrNum : %x\n", addrNum);
+	memcpy(addr->addr, &addrNum, sizeof(U32));
+	#endif
 
 	addr->port = port;
 	addr->addr_len = 0x04;
@@ -120,23 +127,26 @@ static int ntyUdpCreate(void* self)
 	Network *network = self;
 	U8     apn_check = (U8)YxAppGetSimOperator(YX_APP_SIM1);
 	U32    account_id = 0;
+
+	kal_prompt_trace(MOD_YXAPP, " apn_check : %d\n", apn_check);
     if((apn_check==MSIM_OPR_UNKOWN) || (apn_check==MSIM_OPR_NONE))
         return -1;
     //apn_check = (apn != MAPN_WAP && apn != MAPN_NET && apn != MAPN_WIFI);
 	//if(apn_check)
 	//	return 0;
 	//yxNetContext_ptr.apn = apn;
-   // yxNetContext_ptr.port = port;
+    //yxNetContext_ptr.port = port;
+    kal_prompt_trace(MOD_YXAPP, " YxAppDtcntMakeDataAcctId : %d\n", apn_check);
 	account_id = YxAppDtcntMakeDataAcctId(YX_APP_SIM1, NULL, MAPN_NET, &appid);
 	if(account_id==0)
 	{
 		account_id = 0;
 		//YxAppCloseAccount();
-		return -1;
+		return -4;
 	}
 	network->accountId = account_id;
 	//yxNetContext_ptr.account_id = account_id;
-
+	kal_prompt_trace(MOD_YXAPP, " opening accountId %d\n", network->accountId);
     //create udp socket
     sock = soc_create(SOC_PF_INET, SOC_SOCK_DGRAM, 0, MOD_MMI, network->accountId);
     if (sock < 0) {
@@ -162,55 +172,6 @@ static int ntyUdpCreate(void* self)
     return sock;
 }
 
-static U8 ntyUdpCallback(void * data)
-{
-    app_soc_notify_ind_struct * ind = (app_soc_notify_ind_struct *)data;
-	//U8 sock = 0;
-    int ret;
-    Network *network = ntyNetworkInstance();
-	U8 buf[CACHE_BUFFER_SIZE] = {0};
-	sockaddr_struct addr;
-
-    if (NULL == ind)
-    {
-        return MMI_FALSE;
-    }
-    //kwp_debug_print("kwp_udp_callback: event_type=%d", ind->event_type);
-	//sock = ntyGetSocket(network);
-    if (ind->socket_id == ntyGetSocket(network)) 
-    {
-        switch (ind->event_type)
-        {
-        case SOC_WRITE:
-            break;
-        case SOC_READ:
-            {
-                do
-                {
-                	ret = ntyRecvFrame(network, buf, CACHE_BUFFER_SIZE, &addr);
-                    //ret = soc_recvfrom(kwp_sock, protocol_recv_buf, PROTO_BUFF_SIZE, 0, &kwp_fromaddr);
-                    //kwp_debug_print("soc_recvfrom len=%d from %d.%d.%d.%d", ret,
-                    //                kwp_fromaddr.addr[0],kwp_fromaddr.addr[1],kwp_fromaddr.addr[2],kwp_fromaddr.addr[3]);
-                    if (ret > 0) {
-                        kal_prompt_trace(MOD_YXAPP,"%d.%d.%d.%d:%d size:%d --> %x\n", addr.addr[0], addr.addr[1],	
-							addr.addr[2], addr.addr[3],	 addr.port, ret, buf[NTY_PROTO_TYPE_IDX]);
-                    }
-                    //kwp_debug_print("soc_recvfrom rx ret = %d", ret);
-                }while(ret != SOC_WOULDBLOCK);
-            }break;
-        case SOC_CLOSE:
-            {
-            }break;
-        default:
-            {
-            }break;
-        }
-    }
-    
-    return MMI_TRUE;
-}
-
-
 static void ntyMessageOnAck(void) {
 	
 }
@@ -219,17 +180,6 @@ static void* ntyNetworkCtor(void *_self) {
 	Network *network = _self;
 	network->onAck = ntyMessageOnAck;
 	network->ackNum = 1;
-
-#if 1 //Socket Init	
-	mmi_frm_set_protocol_event_handler(MSG_ID_APP_SOC_NOTIFY_IND, (PsIntFuncPtr)ntyUdpCallback, MMI_TRUE);
-	network->sockfd = ntyUdpCreate(_self);
-	if (network->sockfd < 0) {
-		//error(" ERROR opening socket");
-		kal_prompt_trace(MOD_YXAPP, "ERROR opening socket");
-	}
-	//init Server addr
-	ntySetAddr(&serveraddr, *((U32*)addrArray), addrPort);
-#endif
 	
 	return network;
 }
@@ -265,15 +215,17 @@ static int ntyNetworkSendFrame(void *_self, sockaddr_struct *to, U8 *buf, int le
 	//ntyStartTimer();
 	U32 ret;
 	Network *network = _self;	
-	//void* pTimer = ntyNetworkTimerInstance();
+	void* pTimer = ntyNetworkTimerInstance();
 	if (buf[NTY_PROTO_MESSAGE_TYPE] != MSG_ACK) {
-		//ntyStartTimer(pTimer, network->onAck);	
-		StartTimer(NATTY_NETWORK_COMFIRMED_TIMER, RESEND_TIMEOUT, network->onAck);
+		ntyStartTimer(pTimer, network->onAck);	
+		//StartTimer(NATTY_NETWORK_COMFIRMED_TIMER, RESEND_TIMEOUT, network->onAck);
 		network->ackNum ++;
 	}
+
+	kal_prompt_trace(MOD_YXAPP, " ntyNetworkSendFrame \n");
 	
 	memcpy(&network->addr, to, sizeof(sockaddr_struct));
-	bzero(network->buffer, CACHE_BUFFER_SIZE);
+	memset(network->buffer, 0, CACHE_BUFFER_SIZE);
 	memcpy(network->buffer, buf, len);
 	
 	if (buf[NTY_PROTO_MESSAGE_TYPE] == MSG_REQ) {
@@ -285,7 +237,10 @@ static int ntyNetworkSendFrame(void *_self, sockaddr_struct *to, U8 *buf, int le
 	//printf("ntyNetworkSendFrame : %x\n", buf[NTY_PROTO_TYPE_IDX]);
 
 	ret = soc_sendto(network->sockfd, network->buffer, (kal_int32)network->length, 0, &network->addr);
-    //kwp_debug_print("ntp send len %d", ret);
+	kal_prompt_trace(MOD_YXAPP,"sendto : %d.%d.%d.%d:%d size:%d --> %x\n", network->addr.addr[0], network->addr.addr[1],	
+								network->addr.addr[2], network->addr.addr[3],  network->addr.port, ret, buf[NTY_PROTO_TYPE_IDX]);
+
+	//kwp_debug_print("ntp send len %d", ret);
     if (0 > ret)
     {
         if (SOC_WOULDBLOCK == ret)
@@ -298,11 +253,12 @@ static int ntyNetworkSendFrame(void *_self, sockaddr_struct *to, U8 *buf, int le
         }
         
     }
+	return ret;
 }
 
-static U32 ntyNetworkRecvFrame(void *_self, U8 *buf, int len, sockaddr_struct *from) {
+static int ntyNetworkRecvFrame(void *_self, U8 *buf, int len, sockaddr_struct *from) {
 	//ntyStartTimer();
-	U32 ret;
+	int ret;
 	int n = 0;
 	int clientLen = sizeof(sockaddr_struct);
 	sockaddr_struct addr = {0};
@@ -319,23 +275,45 @@ static U32 ntyNetworkRecvFrame(void *_self, U8 *buf, int len, sockaddr_struct *f
 			// CRC 
 			
 			// stop timer
-			StopTimer(NATTY_NETWORK_COMFIRMED_TIMER);
+			void* pTimer = ntyNetworkTimerInstance();
+			ntyStopTimer(pTimer);
 			return n;	
 		} else {
 			return -1;
 		}
 	} else if (buf[NTY_PROTO_MESSAGE_TYPE] == MSG_RET) {
 		
-		StopTimer(NATTY_NETWORK_COMFIRMED_TIMER);
+		void* pTimer = ntyNetworkTimerInstance();
+		ntyStopTimer(pTimer);
 		//have send object
 	} else if (buf[NTY_PROTO_MESSAGE_TYPE] == MSG_UPDATE) {
-		StopTimer(NATTY_NETWORK_COMFIRMED_TIMER);
-		
+		void* pTimer = ntyNetworkTimerInstance();
+		ntyStopTimer(pTimer);
 	}
 
 	return ret;
 	
 }
+
+static int ntyNetworkConnect(void *_self) {
+	Network *network = _self;	
+#if 1 //Socket Init	
+	mmi_frm_set_protocol_event_handler(MSG_ID_APP_SOC_NOTIFY_IND, network->onRecv, MMI_TRUE);
+	network->sockfd = ntyUdpCreate(_self);
+	if (network->sockfd < 0) {
+		//error(" ERROR opening socket");
+		kal_prompt_trace(MOD_YXAPP, "ERROR opening socket");
+		return -1;
+	}
+	//init Server addr
+	kal_prompt_trace(MOD_YXAPP, " opening socket %d, %x\n", network->sockfd, *((U32*)addrArray));
+	ntySetAddr(&serveraddr, addrNum, addrPort);
+
+	return network->sockfd;
+#endif
+}
+
+
 
 static const NetworkOpera ntyNetworkOpera = {
 	sizeof(Network),
@@ -344,6 +322,7 @@ static const NetworkOpera ntyNetworkOpera = {
 	ntyNetworkSendFrame,
 	ntyNetworkRecvFrame,
 	ntyNetworkResendFrame,
+	ntyNetworkConnect,
 };
 
 const void *pNtyNetworkOpera = &ntyNetworkOpera;
@@ -380,6 +359,15 @@ int ntyRecvFrame(void *self, U8 *buf, int len, sockaddr_struct *from) {
 	return -2;
 }
 
+int ntyConnect(void *self) {
+	const NetworkOpera *const * pNetworkOpera = self;
+
+	if (self && (*pNetworkOpera) && (*pNetworkOpera)->recv) {
+		return (*pNetworkOpera)->connect(self);
+	}
+	return -3;
+}
+
 U8 ntyGetSocket(void *self) {
 	Network *network = self;
 	return network->sockfd;
@@ -398,5 +386,10 @@ C_DEVID ntyGetDestDevId(void *self) {
 U32 ntyGetAccountId(void *self) {
 	Network *network = self;
 	return *(C_DEVID*)(&network->accountId);
+}
+
+void ntySetRecvProc(void *self, HANDLE_RECV func) {
+	Network *network = self;
+	network->onRecv = func;
 }
 

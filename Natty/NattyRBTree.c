@@ -632,11 +632,11 @@ C_DEVID* ntyFriendsTreeGetAllNodeList(const void *self) {
 	//C_DEVID *list = (C_DEVID*)malloc(count*sizeof(C_DEVID));
 	list = (C_DEVID*)OslMalloc(count*sizeof(C_DEVID));
 	friends = list;
-	assert(list);
+	//assert(list);
 	memset(list, 0, count*sizeof(C_DEVID));
 	
 	list = ntyPreOrderTraversalForList(tree, tree->root, list);
-	assert((list-friends) == count);
+	//assert((list-friends) == count);
 
 	return friends;
 }
